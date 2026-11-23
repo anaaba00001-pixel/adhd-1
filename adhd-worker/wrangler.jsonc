@@ -15,5 +15,18 @@
       "database_name": "adhd-guide-db",
       "database_id": "3db26531-d216-4baf-b271-95976982d955"
     }
+  ],
+  "ai": {
+    "binding": "AI"
+  },
+  "ratelimits": [
+    {
+      "name": "AI_RATE",
+      "namespace_id": "271903",
+      "simple": {
+        "limit": 3,
+        "period": 60
+      }
+    }
   ]
 }

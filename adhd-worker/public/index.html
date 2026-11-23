@@ -222,6 +222,16 @@ License-Reference: /usr/share/common-licenses/GPL-3
 <section id="v-ai" hidden></section>
 <section id="v-idx" hidden></section>
 </main></div>
+<dialog id="ai-review" dir="rtl" aria-labelledby="ai-review-title" style="inline-size:min(34rem,90vw);border:1px solid #888;border-radius:14px;padding:1rem">
+  <h2 id="ai-review-title">راجعي البيانات قبل الإرسال</h2>
+  <p>سيُرسل النص أدناه إلى Cloudflare Workers AI. يمكنك تعديل النص وحذف ما لا ترغبين في مشاركته.</p>
+  <label><input id="ai-details" type="checkbox"> أدرجي ملاحظات التمارين وسجلات الدفتر في المعاينة</label>
+  <textarea id="ai-preview" aria-label="النص الذي سيُرسل" maxlength="3500" rows="8" style="width:100%"></textarea>
+  <div class="row">
+    <button class="btn" id="ai-send" type="button">إرسال النص</button>
+    <form method="dialog"><button class="btn">إلغاء</button></form>
+  </div>
+</dialog>
 <script type="module">
 const W=[
 ["ملاحظة نمطك","مراقبة الذات",["سجّل ثلاثة مواقف تعطّلت فيها مهمة: ما أردت إنجازه، وأين توقفت، وما كان حولك.","دوّن لثلاثة أيام متى يكون تركيزك أعلى ومتى يكون أدنى.","عند أي تأخير، صنّفه: خطوة غامضة، مهمة طويلة، معلومة ناقصة، أو خوف من الخطأ.","اختر موقفًا واحدًا يتكرر وسمّه «موقف الأسبوع»."]],
@@ -305,7 +315,14 @@ function writeDraft(value) {
 }
 
 function save() {
-    if (revision === undefined) return;
+    if (revision === undefined) {
+        draft = { state: st };
+        const stored = writeDraft(draft);
+        status.textContent = stored ? "حُفظت مسودة في هذا المتصفح. أعيدي محاولة المزامنة أو صدّري نسخة."
+            : "تعذر الحفظ في المتصفح. صدّري نسخة قبل إغلاق الصفحة.";
+        document.getElementById("export-draft").hidden = false;
+        return;
+    }
     changed = true;
     draft = { state: st, revision };
     const stored = writeDraft(draft);
@@ -365,7 +382,7 @@ async function openCloud() {
         conflict = false;
         changed = false;
         st = cloud.state;
-        if (draft?.revision === revision) {
+        if (draft && draft.revision === revision) {
             st = draft.state;
             save();
         } else if (draft) {
@@ -378,7 +395,10 @@ async function openCloud() {
         reader.inert = false;
         render();
     } catch (error) {
-        status.textContent = error.message || "تعذّر تحميل التقدم.";
+        status.textContent = "تعذّر تحميل التقدم السحابي. يمكنك استخدام الدليل وحفظ مسودة محلية.";
+        if (revision === undefined && draft) st = draft.state;
+        reader.inert = false;
+        render();
         retry.hidden = false;
         retry.textContent = "إعادة محاولة التحميل";
     }
@@ -462,7 +482,17 @@ function prog(){
  $('v-prog').querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{st.wk=+b.dataset.w;save();prog()});
  $('v-prog').querySelectorAll('[data-c]').forEach(b=>b.onchange=()=>{st.done[b.dataset.c]=b.checked;save();prog()});
  $('v-prog').querySelectorAll('[data-n]').forEach(b=>b.oninput=()=>{st.notes[b.dataset.n]=b.value;save()});
- $('v-prog').querySelectorAll('[data-x]').forEach(b=>b.onclick=async()=>{const k=b.dataset.x,[w,j]=k.split('-').map(Number);b.disabled=true;b.textContent='جارٍ التحضير…';AIX[k]=await ask(`التمرين (أسبوع ${w+1}: ${W[w][0]}، مجال ${W[w][1]}): ${W[w][2][j]}\nملاحظة المستخدم: ${st.notes[k]||'لا توجد'}\nالمطلوب: 1) اشرح التمرين بخطوات قصيرة. 2) مثال واقعي واحد. 3) إن وُجدت ملاحظة فاقترح تعديلًا صغيرًا واحدًا. بحد أقصى 150 كلمة.`);prog()});
+ $('v-prog').querySelectorAll('[data-x]').forEach(button => {
+    button.onclick = () => {
+        const key = button.dataset.x;
+        const [week, exercise] = key.split("-").map(Number);
+        requestGuideAI("explain", key, prog, {
+            button,
+            text: "الأسبوع " + (week + 1) + " — " + W[week][0] + "\nالتمرين: " + W[week][2][exercise],
+            note: st.notes[key] || ""
+        });
+    };
+ });
 }
 function sheets(){
  let h='';
@@ -477,8 +507,54 @@ function guide(){
  $('v-guide').innerHTML=G.map(([t,x])=>`<div class="card"><h2>${t}</h2><div>${x}</div></div>`).join('')+`<div class="card mu">المراجع: إرشاد NICE NG87؛ NIMH «ADHD in Adults»؛ Safren وآخرون 2010 (JAMA)؛ Sprich وآخرون؛ López وآخرون 2018 (Cochrane)؛ Ostinelli وآخرون 2025 (Lancet Psychiatry)؛ Alderson وآخرون 2013؛ Beheshti وآخرون 2020 (BMC Psychiatry)؛ Young وآخرون 2020 (BMC Psychiatry).</div>`;
 }
 const AIX={};
-const SYS='أنت مساعد تدريبي عربي داخل دليل تدريب ذاتي لمهارات التنظيم لدى بالغين لديهم صعوبات انتباه. لا تشخّص ولا تقل إن كان لدى المستخدم ADHD أو لا، ولا تتكلم عن أدوية أو جرعات (وجّه إلى مختص). إن ظهرت علامات أزمة نفسية أو إيذاء للنفس فتوقف عن التدريب وانصحه بالتواصل فورًا مع مختص أو جهة طوارئ في بلده. لا تدّعِ أن التمارين مثبتة علميًا فهي تدريبية مستلهمة من مهارات CBT المكيّفة. اكتب بالعربية المبسطة وبإيجاز.';
-async function ask(p){const s=await window.claude?.use?.('sample');if(!s)return 'الذكاء الاصطناعي غير متاح في هذا العرض.';try{return (await s(SYS+'\n\n'+p,{cache:false})).text}catch(e){return 'تعذّر الحصول على رد ('+(e.code||'خطأ')+'). حاول لاحقًا.'}}
+function downloadSummary() {
+    const url = URL.createObjectURL(new Blob([AIX.sum], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "adhd-summary.txt";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function requestGuideAI(mode, target, redraw, exercise) {
+    const dialog = $("ai-review");
+    const details = $("ai-details");
+    const preview = $("ai-preview");
+    const send = $("ai-send");
+    const completed = W.flatMap((week, i) => week[2].flatMap((exercise, j) =>
+        st.done[i + "-" + j] ? ["الأسبوع " + (i + 1) + " — " + exercise] : []));
+    const basic = "الأسبوع المحدد: " + (st.wk + 1) + "\nالتمارين المكتملة: " + completed.length;
+    const full = exercise?.text ?? (basic + (completed.length ? "\n" + completed.join("\n") : ""));
+    const extra = exercise ? exercise.note : data();
+    details.checked = false;
+    const refresh = () => { preview.value = (details.checked && extra ? full.slice(0, 1200) + "\n" + extra : full).slice(0, 3500); };
+    refresh();
+    details.onchange = refresh;
+    send.disabled = false;
+    send.onclick = async () => {
+        const text = preview.value.trim();
+        if (!text) { preview.focus(); return; }
+        send.disabled = true;
+        dialog.close();
+        const trigger = exercise?.button ?? $(mode === "tips" ? "tp" : "sm");
+        if (trigger) { trigger.disabled = true; trigger.textContent = "جارٍ إعداد الرد…"; }
+        try {
+            const response = await fetch("/api/ai", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mode, text }), cache: "no-store"
+            });
+            const result = await response.json();
+            if (!response.ok) throw Error(result.error || "تعذّر إعداد الرد.");
+            AIX[target] = result.text;
+        } catch (error) {
+            AIX[target] = error.message || "تعذّر الاتصال. حاولي لاحقًا.";
+        } finally {
+            send.disabled = false;
+            redraw();
+        }
+    };
+    dialog.showModal();
+}
 function data(){let o='';T.forEach((tr,i)=>tr[2].forEach((x,j)=>{const k='t'+i+'-'+j;if(st.done[k]||st.notes[k])o+=`[مسار ${tr[0]}] ${st.done[k]?'منجز':'غير منجز'}: ${x}\nملاحظتي: ${(st.notes[k]||'').slice(0,300)}\n`}));W.forEach((w,i)=>w[2].forEach((x,j)=>{const k=i+'-'+j;if(st.done[k]||st.notes[k])o+=`[أسبوع ${i+1} ${w[0]}] ${st.done[k]?'منجز':'غير منجز'}: ${x}\nملاحظتي: ${(st.notes[k]||'').slice(0,300)}\n`}));S.forEach(([n,f],i)=>(st.sheets[i]||[]).forEach(e=>{o+=`[${n}] `+e.map((v,j)=>v?f[j]+': '+v.slice(0,200):'').filter(Boolean).join(' | ')+'\n'}));return o.slice(0,7000)}
 function dash(){
  const doms=[...new Set(W.map(w=>w[1]))],tot=Object.entries(st.done).filter(([k,v])=>v&&k[0]!=='t').length;
@@ -487,14 +563,15 @@ function dash(){
  let h=`<div class="card stats"><div><big>${tot}/48</big>تمرين منجز</div><div><big>${W.filter((_,i)=>wkDone(i)===4).length}/12</big>أسبوع مكتمل</div><div><big>${nt+ent}</big>ملاحظة وسجل</div></div><div class="card"><h2>الإنجاز لكل أسبوع</h2>`;
  h+=W.map((w,i)=>`<div class="row"><b>أسبوع ${i+1}</b><div class="bar"><i style="width:${wkDone(i)*25}%"></i></div>${wkDone(i)}/4</div>`).join('')+'</div>';
  if(tot)h+=`<div class="card"><h2>المجال الأكثر ممارسة</h2>${top[0]} (${top[1]} تمرينًا)</div>`;
- h+=`<div class="card"><h2>نصائح من بياناتك</h2><div class="mu">عند الضغط يُرسل ما سجّلته إلى Claude لتوليد اقتراحات تدريبية. ليست تقييمًا طبيًا.</div><button class="btn" id="tp">اقترح لي الخطوة التالية</button>${AIX.tips?`<div class="out">${esc(AIX.tips)}</div>`:''}</div>`;
+ h+=`<div class="card"><h2>نصائح من بياناتك</h2><div class="mu">راجعي البيانات قبل إرسالها لتوليد اقتراحات تنظيمية.</div><button class="btn" id="tp">اقترح لي الخطوة التالية</button>${AIX.tips?`<div class="out">${esc(AIX.tips)}</div>`:''}</div>`;
  $('v-dash').innerHTML=h;
- $('tp').onclick=async()=>{const d=data();if(!d){AIX.tips='سجّل تمرينًا أو ملاحظة أولًا لأقدّم اقتراحات مبنية عليها.';return dash()}$('tp').disabled=true;$('tp').textContent='جارٍ التحليل…';AIX.tips=await ask('هذه بيانات مستخدم من تمارين تدريبية:\n'+d+'\nاقترح 3 خطوات عملية صغيرة للأسبوع القادم مبنية على ما كتبه فقط، وانتبه لما تعثّر فيه. لا تقيّم شدة ولا تشخّص.');dash()}
+ $('tp').onclick = () => requestGuideAI("tips", "tips", dash);
 }
 function aiTab(){
- $('v-ai').innerHTML=`<div class="card"><h2>استخلاص النتائج</h2><div class="mu">يجمع ما سجّلته في ملخص تحضيري يمكنك أخذه إلى المختص. هو ليس نتيجة تقييم ولا تشخيصًا. عند الضغط يُرسل ما سجّلته إلى Claude.</div><button class="btn" id="sm">استخلص الملخص</button>${AIX.sum?`<div class="out">${esc(AIX.sum)}</div><button class="btn" id="dl">تنزيل الملخص</button>`:''}</div>`;
- $('sm').onclick=async()=>{const d=data();if(!d){AIX.sum='لا توجد بيانات كافية بعد. أنجز تمارين أو اكتب ملاحظات ثم عد.';return aiTab()}$('sm').disabled=true;$('sm').textContent='جارٍ الاستخلاص…';AIX.sum=await ask('بيانات المستخدم:\n'+d+'\nاكتب ملخصًا بأربعة أقسام: 1) المواقف والصعوبات المتكررة كما سجّلها. 2) ما بدا مفيدًا. 3) ما تعثّر. 4) أسئلة مقترحة يطرحها على المختص. استند للبيانات فقط، وإن كانت قليلة فاذكر ذلك. لا تشخّص ولا تقيّم شدة.');aiTab()};
- const dl=$('dl');if(dl)dl.onclick=async()=>{const d=await window.claude?.use?.('downloads');if(!d){dl.textContent='التنزيل غير متاح هنا';return}try{await d.save({filename:'adhd-summary.txt',data:'ملخص تدريبي ذاتي (ليس تشخيصًا)\n\n'+AIX.sum})}catch(e){}}
+ $('v-ai').innerHTML=`<div class="card"><h2>استخلاص النتائج</h2><div class="mu">يجمع ما سجّلته في ملخص تحضيري يمكنك أخذه إلى المختص. هو ليس نتيجة تقييم ولا تشخيصًا. راجعي البيانات التي تختارين إرسالها.</div><button class="btn" id="sm">استخلص الملخص</button>${AIX.sum?`<div class="out">${esc(AIX.sum)}</div><button class="btn" id="dl">تنزيل الملخص</button>`:''}</div>`;
+ $('sm').onclick = () => requestGuideAI("summary", "sum", aiTab);
+ const dl = $("dl");
+ if (dl) dl.onclick = downloadSummary;
 }
 const CH=[[1,'اضطراب فرط الحركة وتشتت الانتباه','تبويب «الدليل»'],[2,'الإنهاك','مسار الإنهاك'],[3,'الثقة','التفكير المرن',[9,10]],[4,'التشخيص','تبويب «الدليل»، والتشخيص عند المختص'],[5,'الوظائف التنفيذية','الدليل + التنظيم والتشتّت',[3,4,6]],[6,'الشؤون المالية','مسار المال'],[7,'الاتزان','تنظيم الانفعال',[11]],[8,'فرط التركيز','مسار فرط التركيز'],[9,'الاندفاع','تنظيم الانفعال وحل المشكلات',[11]],[10,'العمل','التنظيم وتقدير الوقت',[3,4]],[11,'اللطف','النقد الذاتي والتفكير المرن',[9]],[12,'الحب','مسار العلاقات وقول لا'],[13,'العلاج الدوائي','موضوع تعريفي فقط: القرار للطبيب المختص ولا تمارين عليه'],[14,'قول لا','مسار العلاقات وقول لا'],[15,'التنظيم','التنظيم والتخطيط',[3,4,5]],[16,'المماطلة','التسويف وصعوبة البدء',[7,8]],[17,'الترك','بانتظار تأكيد المعنى قبل الربط'],[18,'الرفض','حساسية الرفض مصطلح وصفي شائع وليس تشخيصًا رسميًا، وتُدرَّب عبر الأفكار والانفعال',[9,11]],[19,'النوم','مسار النوم'],[20,'إدارة الوقت','تقدير الوقت',[4]],[22,'العادات السيئة','ربط البدء بإشارة ثابتة',[8]],[23,'نقاط الضعف','التفكير المرن',[10]],[24,'الاختلافات الشديدة لدى النساء','تبويب «الدليل»'],[25,'الجسد','مسار الجسد والزن'],[26,'الزن','مسار الجسد والزن']];
 const T=[['الإنهاك','إدارة الطاقة',['سجّل لثلاثة أيام ما استنزف طاقتك وما أعادها، وقيّم كلًا من 0 إلى 10.','ضع استراحة قصيرة مجدولة قبل أن تتعب بدل أن تنتظر الانهيار.','اختر التزامًا واحدًا يمكن تخفيفه أو تأجيله هذا الأسبوع.'],'استمرار الإرهاق الشديد يستدعي مراجعة مختص.'],['المال','التنظيم والتخطيط',['اجمع الاشتراكات والفواتير المتكررة في قائمة واحدة بتواريخها.','ضع تذكيرًا قبل كل فاتورة بيومين.','قبل أي شراء غير مخطط انتظر مدة تحددها مسبقًا ثم قرّر.']],['فرط التركيز','إدارة الانتباه',['لاحظ متى يحدث انغماس طويل، وفي أي نشاط، وكم استمر.','اضبط منبهًا لتتفقد الوقت وحاجاتك الأساسية مثل الماء والطعام.','وجّه جلسة انغماس واحدة نحو مهمة مهمة خططت لها مسبقًا.']],['العلاقات وقول لا','التواصل والحدود',['قبل الموافقة على طلب اسأل: هل أريد وهل أستطيع؟ ثم أجِب بعد ساعة.','جهّز عبارة قصيرة للاعتذار عن طلب وجرّبها.','حدّد موعدًا ثابتًا للتواصل مع شخص يهمك حتى لا يضيع في الزحام.']],['النوم','الروتين',['سجّل وقت النوم والاستيقاظ لأسبوع دون تغيير الروتين.','حدّد إشارة ثابتة لبدء الاستعداد للنوم.','أبعد الشاشة عن السرير مدة محددة وسجّل الفرق.'],'استمرار مشكلات النوم يستدعي مراجعة مختص.'],['الجسد والزن','الوعي الجسدي',['مرة يوميًا توقف دقيقة وسمِّ ما تشعر به جسديًا.','جرّب حركة قصيرة قبل جلسة عمل طويلة.','خصّص خمس دقائق هدوء بلا شاشة وسجّل ما لاحظته.']]];

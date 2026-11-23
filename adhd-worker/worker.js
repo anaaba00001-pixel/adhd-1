@@ -1,3 +1,4 @@
+import { guideAI } from "./ai.js";
 import { validState } from "./public/state.js";
 const encoder = new TextEncoder();
 
@@ -42,6 +43,7 @@ export default {
     async fetch(request, env) {
         const url = new URL(request.url);
         try {
+            if (url.pathname === "/api/ai") return await guideAI(request, env, url.origin, json);
             if (url.pathname === "/api/progress") {
                 if (!env.DB) return json({ error: "أضيفي ارتباط DB في Cloudflare." }, 503);
                 return await progress(request, env.DB, url.origin);
