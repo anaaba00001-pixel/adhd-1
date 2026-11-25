@@ -1,0 +1,32 @@
+{
+  "name": "adhd-1",
+  "main": "adhd-worker/worker.js",
+  "compatibility_date": "2026-11-22",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./adhd-worker/public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "adhd-guide-db",
+      "database_id": "3db26531-d216-4baf-b271-95976982d955"
+    }
+  ],
+  "ai": {
+    "binding": "AI"
+  },
+  "ratelimits": [
+    {
+      "name": "AI_RATE",
+      "namespace_id": "271903",
+      "simple": {
+        "limit": 3,
+        "period": 60
+      }
+    }
+  ]
+}

@@ -224,7 +224,7 @@ License-Reference: /usr/share/common-licenses/GPL-3
 </main></div>
 <dialog id="ai-review" dir="rtl" aria-labelledby="ai-review-title" style="inline-size:min(34rem,90vw);border:1px solid #888;border-radius:14px;padding:1rem">
   <h2 id="ai-review-title">راجعي البيانات قبل الإرسال</h2>
-  <p>سيُرسل النص أدناه إلى Cloudflare Workers AI. يمكنك تعديل النص وحذف ما لا ترغبين في مشاركته.</p>
+  <p>سيُرسل النص أدناه إلى نموذج Qwen عبر Cloudflare Workers AI. يمكنك تعديل النص وحذف ما لا ترغبين في مشاركته.</p>
   <label><input id="ai-details" type="checkbox"> أدرجي ملاحظات التمارين وسجلات الدفتر في المعاينة</label>
   <textarea id="ai-preview" aria-label="النص الذي سيُرسل" maxlength="3500" rows="8" style="width:100%"></textarea>
   <div class="row">
@@ -541,13 +541,28 @@ function requestGuideAI(mode, target, redraw, exercise) {
         try {
             const response = await fetch("/api/ai", {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ mode, text }), cache: "no-store"
+                body: JSON.stringify({ mode, text }), cache: "no-store",
+                signal: AbortSignal.timeout(40000)
             });
+            if (response.status === 404 || response.status === 405
+                || (response.ok && !response.headers.get("Content-Type")?.includes("application/json"))) {
+                throw new Error("افتحي رابط الدليل المنشور على Cloudflare لتشغيل الذكاء الاصطناعي.");
+            }
+            if (!response.headers.get("Content-Type")?.includes("application/json")) {
+                throw new Error("خدمة الذكاء الاصطناعي غير متاحة مؤقتًا. حاولي لاحقًا.");
+            }
             const result = await response.json();
             if (!response.ok) throw Error(result.error || "تعذّر إعداد الرد.");
+            if (typeof result.text !== "string" || !result.text.trim()) {
+                throw new Error("لم يصل رد نصي. حاولي مرة أخرى.");
+            }
             AIX[target] = result.text;
         } catch (error) {
-            AIX[target] = error.message || "تعذّر الاتصال. حاولي لاحقًا.";
+            AIX[target] = error.name === "TimeoutError"
+                ? "تأخر الرد. حاولي مرة أخرى."
+                : error instanceof TypeError
+                    ? "تعذّر الاتصال بخدمة الذكاء الاصطناعي. افتحي رابط الدليل المنشور وحاولي مرة أخرى."
+                    : error.message || "تعذّر إعداد الرد.";
         } finally {
             send.disabled = false;
             redraw();
