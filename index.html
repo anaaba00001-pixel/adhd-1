@@ -250,13 +250,13 @@ const G=[
 ];
 const K='adhd-v1';let st={done:{},notes:{},sheets:{},wk:0,tab:'prog'};
 try{Object.assign(st,JSON.parse(localStorage.getItem(K)||'{}'))}catch(e){}
-if(st.tab==='idx')st.tab='prog';
+if(st.tab==='idx'||st.tab==='ai')st.tab='prog';
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(st))}catch(e){}};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const wkDone=i=>[0,1,2,3].filter(j=>st.done[i+'-'+j]).length;
 function tabs(){
- const t=[['prog','البرنامج'],['dash','تقدّمي'],['ai','استخلاص'],['sheets','الدفتر'],['guide','الدليل']];
+ const t=[['prog','البرنامج'],['dash','تقدّمي'],['sheets','الدفتر'],['guide','الدليل']];
  $('tabs').innerHTML=t.map(([k,l])=>`<button class="${st.tab===k?'on':''}" data-k="${k}">${l}</button>`).join('');
  $('tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{st.tab=b.dataset.k;save();render()});
  t.forEach(([k])=>$('v-'+k).hidden=st.tab!==k);
@@ -266,12 +266,11 @@ function prog(){
  let h=`<div class="mu">أنجزت ${total} من 48 تمرينًا</div><div class="bar"><i style="width:${total/48*100}%"></i></div><div class="wk">`;
  h+=W.map((_,k)=>`<button class="${k===i?'on':wkDone(k)===4?'done':''}" data-w="${k}">${k+1}</button>`).join('')+'</div>';
  h+=`<div class="card"><h2>الأسبوع ${i+1} · ${w[0]}</h2><span class="tag">${w[1]}</span><div class="mu">أنجزت ${wkDone(i)} من 4 هذا الأسبوع. التمرين الأول من الدليل الأصلي والبقية تدريبات على المهارة نفسها.</div></div>`;
- w[2].forEach((x,j)=>{const k=i+'-'+j;h+=`<div class="card ex"><label><input type="checkbox" data-c="${k}" ${st.done[k]?'checked':''}><span><b>${j+1}.</b> ${x}</span></label><textarea data-n="${k}" placeholder="ملاحظتك بعد التطبيق: ماذا حدث؟ وما الذي ستعدّله؟">${esc(st.notes[k]||'')}</textarea><button class="btn sm" data-x="${k}">اشرح لي هذا التمرين</button>${AIX[k]?`<div class="out">${esc(AIX[k])}</div>`:''}</div>`});
+ w[2].forEach((x,j)=>{const k=i+'-'+j;h+=`<div class="card ex"><label><input type="checkbox" data-c="${k}" ${st.done[k]?'checked':''}><span><b>${j+1}.</b> ${x}</span></label><textarea data-n="${k}" placeholder="ملاحظتك بعد التطبيق: ماذا حدث؟ وما الذي ستعدّله؟">${esc(st.notes[k]||'')}</textarea></div>`});
  $('v-prog').innerHTML=h+'<div id="tracks"></div>';
  $('v-prog').querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{st.wk=+b.dataset.w;save();prog()});
  $('v-prog').querySelectorAll('[data-c]').forEach(b=>b.onchange=()=>{st.done[b.dataset.c]=b.checked;save();prog()});
  $('v-prog').querySelectorAll('[data-n]').forEach(b=>b.oninput=()=>{st.notes[b.dataset.n]=b.value;save()});
- $('v-prog').querySelectorAll('[data-x]').forEach(b=>b.onclick=async()=>{const k=b.dataset.x,[w,j]=k.split('-').map(Number);b.disabled=true;b.textContent='جارٍ التحضير…';AIX[k]=await ask(`التمرين (أسبوع ${w+1}: ${W[w][0]}، مجال ${W[w][1]}): ${W[w][2][j]}\nملاحظة المستخدم: ${st.notes[k]||'لا توجد'}\nالمطلوب: 1) اشرح التمرين بخطوات قصيرة. 2) مثال واقعي واحد. 3) إن وُجدت ملاحظة فاقترح تعديلًا صغيرًا واحدًا. بحد أقصى 150 كلمة.`);prog()});
  optionalTracks();
 }
 function sheets(){
@@ -299,10 +298,8 @@ function dash(){
  let h=`<section class="overview"><div class="dial" style="--progress:${percent}%"><b>${num(percent)}٪</b></div><div><h2>تقدّمي في البرنامج</h2><p>أنجزت ${num(tot)} من ٤٨ تمرينًا</p><div class="counts"><span><b>${num(completed)}</b> أسبوع مكتمل</span><span><b>${num(nt+ent)}</b> ملاحظة وسجل</span></div></div></section><h2 class="weeks-title">أسابيعي التدريبية</h2><div class="weekmap">`;
  h+=W.map((w,i)=>{const n=wkDone(i);return `<button type="button" class="weekcard" data-week="${i}" aria-label="فتح الأسبوع ${i+1}، ${w[0]}، ${n} من 4 تمارين"><small>الأسبوع ${num(i+1)}</small><strong>${w[0]}</strong><span class="marks" aria-hidden="true">${w[2].map((_,j)=>`<i class="${st.done[i+'-'+j]?'filled':''}"></i>`).join('')}</span><span class="wstatus">${n===4?'مكتمل':n?num(n)+' من ٤ تمارين':'لم يبدأ بعد'}</span></button>`}).join('')+'</div>';
  if(tot)h+=`<div class="card"><h2>المجال الأكثر ممارسة</h2>${top[0]} (${top[1]} تمرينًا)</div>`;
- h+=`<div class="card"><h2>نصائح من بياناتك</h2><div class="mu">عند الضغط يُرسل ما سجّلته إلى Claude لتوليد اقتراحات تدريبية. ليست تقييمًا طبيًا.</div><button class="btn" id="tp">اقترح لي الخطوة التالية</button>${AIX.tips?`<div class="out">${esc(AIX.tips)}</div>`:''}</div>`;
  $('v-dash').innerHTML=h;
  $('v-dash').querySelectorAll('[data-week]').forEach(button=>button.onclick=()=>{st.wk=Number(button.dataset.week);st.tab='prog';save();render();$('reader').scrollIntoView()});
- $('tp').onclick=async()=>{const d=data();if(!d){AIX.tips='سجّل تمرينًا أو ملاحظة أولًا لأقدّم اقتراحات مبنية عليها.';return dash()}$('tp').disabled=true;$('tp').textContent='جارٍ التحليل…';AIX.tips=await ask('هذه بيانات مستخدم من تمارين تدريبية:\n'+d+'\nاقترح 3 خطوات عملية صغيرة للأسبوع القادم مبنية على ما كتبه فقط، وانتبه لما تعثّر فيه. لا تقيّم شدة ولا تشخّص.');dash()}
 }
 function aiTab(){
  $('v-ai').innerHTML=`<div class="card"><h2>استخلاص النتائج</h2><div class="mu">يجمع ما سجّلته في ملخص تحضيري يمكنك أخذه إلى المختص. هو ليس نتيجة تقييم ولا تشخيصًا. عند الضغط يُرسل ما سجّلته إلى Claude.</div><button class="btn" id="sm">استخلص الملخص</button>${AIX.sum?`<div class="out">${esc(AIX.sum)}</div><button class="btn" id="dl">تنزيل الملخص</button>`:''}</div>`;
@@ -317,7 +314,7 @@ function optionalTracks(){
  $('tracks').querySelectorAll('[data-c]').forEach(b=>b.onchange=()=>{st.done[b.dataset.c]=b.checked;save()});
  $('tracks').querySelectorAll('[data-n]').forEach(b=>b.oninput=()=>{st.notes[b.dataset.n]=b.value;save()});
 }
-function render(){tabs();prog();dash();aiTab();sheets();guide()}
+function render(){tabs();prog();dash();sheets();guide()}
 document.querySelectorAll('[data-open]').forEach(link=>{
  link.addEventListener('click',()=>{
    st.tab=link.dataset.open;

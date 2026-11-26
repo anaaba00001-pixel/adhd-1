@@ -467,7 +467,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const wkDone=i=>[0,1,2,3].filter(j=>st.done[i+'-'+j]).length;
 function tabs(){
- const t=[['prog','البرنامج'],['dash','تقدّمي'],['ai','استخلاص'],['idx','الفهرس'],['sheets','الدفتر'],['guide','الدليل']];
+ const t=[['prog','البرنامج'],['dash','تقدّمي'],['idx','الفهرس'],['sheets','الدفتر'],['guide','الدليل']];
  $('tabs').innerHTML=t.map(([k,l])=>`<button class="${st.tab===k?'on':''}" data-k="${k}">${l}</button>`).join('');
  $('tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{st.tab=b.dataset.k;save();render()});
  t.forEach(([k])=>$('v-'+k).hidden=st.tab!==k);
@@ -477,22 +477,11 @@ function prog(){
  let h=`<div class="mu">أنجزت ${total} من 48 تمرينًا</div><div class="bar"><i style="width:${total/48*100}%"></i></div><div class="wk">`;
  h+=W.map((_,k)=>`<button class="${k===i?'on':wkDone(k)===4?'done':''}" data-w="${k}">${k+1}</button>`).join('')+'</div>';
  h+=`<div class="card"><h2>الأسبوع ${i+1} · ${w[0]}</h2><span class="tag">${w[1]}</span><div class="mu">أنجزت ${wkDone(i)} من 4 هذا الأسبوع. التمرين الأول من الدليل الأصلي والبقية تدريبات على المهارة نفسها.</div></div>`;
- w[2].forEach((x,j)=>{const k=i+'-'+j;h+=`<div class="card ex"><label><input type="checkbox" data-c="${k}" ${st.done[k]?'checked':''}><span><b>${j+1}.</b> ${x}</span></label><textarea data-n="${k}" placeholder="ملاحظتك بعد التطبيق: ماذا حدث؟ وما الذي ستعدّله؟">${esc(st.notes[k]||'')}</textarea><button class="btn sm" data-x="${k}">اشرح لي هذا التمرين</button>${AIX[k]?`<div class="out">${esc(AIX[k])}</div>`:''}</div>`});
+ w[2].forEach((x,j)=>{const k=i+'-'+j;h+=`<div class="card ex"><label><input type="checkbox" data-c="${k}" ${st.done[k]?'checked':''}><span><b>${j+1}.</b> ${x}</span></label><textarea data-n="${k}" placeholder="ملاحظتك بعد التطبيق: ماذا حدث؟ وما الذي ستعدّله؟">${esc(st.notes[k]||'')}</textarea></div>`});
  $('v-prog').innerHTML=h;
  $('v-prog').querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{st.wk=+b.dataset.w;save();prog()});
  $('v-prog').querySelectorAll('[data-c]').forEach(b=>b.onchange=()=>{st.done[b.dataset.c]=b.checked;save();prog()});
  $('v-prog').querySelectorAll('[data-n]').forEach(b=>b.oninput=()=>{st.notes[b.dataset.n]=b.value;save()});
- $('v-prog').querySelectorAll('[data-x]').forEach(button => {
-    button.onclick = () => {
-        const key = button.dataset.x;
-        const [week, exercise] = key.split("-").map(Number);
-        requestGuideAI("explain", key, prog, {
-            button,
-            text: "الأسبوع " + (week + 1) + " — " + W[week][0] + "\nالتمرين: " + W[week][2][exercise],
-            note: st.notes[key] || ""
-        });
-    };
- });
 }
 function sheets(){
  let h='';
@@ -578,9 +567,7 @@ function dash(){
  let h=`<div class="card stats"><div><big>${tot}/48</big>تمرين منجز</div><div><big>${W.filter((_,i)=>wkDone(i)===4).length}/12</big>أسبوع مكتمل</div><div><big>${nt+ent}</big>ملاحظة وسجل</div></div><div class="card"><h2>الإنجاز لكل أسبوع</h2>`;
  h+=W.map((w,i)=>`<div class="row"><b>أسبوع ${i+1}</b><div class="bar"><i style="width:${wkDone(i)*25}%"></i></div>${wkDone(i)}/4</div>`).join('')+'</div>';
  if(tot)h+=`<div class="card"><h2>المجال الأكثر ممارسة</h2>${top[0]} (${top[1]} تمرينًا)</div>`;
- h+=`<div class="card"><h2>نصائح من بياناتك</h2><div class="mu">راجعي البيانات قبل إرسالها لتوليد اقتراحات تنظيمية.</div><button class="btn" id="tp">اقترح لي الخطوة التالية</button>${AIX.tips?`<div class="out">${esc(AIX.tips)}</div>`:''}</div>`;
  $('v-dash').innerHTML=h;
- $('tp').onclick = () => requestGuideAI("tips", "tips", dash);
 }
 function aiTab(){
  $('v-ai').innerHTML=`<div class="card"><h2>استخلاص النتائج</h2><div class="mu">يجمع ما سجّلته في ملخص تحضيري يمكنك أخذه إلى المختص. هو ليس نتيجة تقييم ولا تشخيصًا. راجعي البيانات التي تختارين إرسالها.</div><button class="btn" id="sm">استخلص الملخص</button>${AIX.sum?`<div class="out">${esc(AIX.sum)}</div><button class="btn" id="dl">تنزيل الملخص</button>`:''}</div>`;
@@ -600,7 +587,7 @@ function idx(){
  $('v-idx').querySelectorAll('[data-c]').forEach(b=>b.onchange=()=>{st.done[b.dataset.c]=b.checked;save()});
  $('v-idx').querySelectorAll('[data-n]').forEach(b=>b.oninput=()=>{st.notes[b.dataset.n]=b.value;save()});
 }
-function render(){tabs();prog();dash();aiTab();idx();sheets();guide()}
+function render(){if(st.tab==='ai')st.tab='prog';tabs();prog();dash();idx();sheets();guide()}
 document.querySelectorAll('[data-open]').forEach(link=>{
  link.addEventListener('click',()=>{
    st.tab=link.dataset.open;
