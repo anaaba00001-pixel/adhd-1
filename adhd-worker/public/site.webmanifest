@@ -1,0 +1,11 @@
+{
+  "name": "دليل ADHD العملي للبالغين",
+  "short_name": "دليل ADHD",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f5ed",
+  "theme_color": "#51458c",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

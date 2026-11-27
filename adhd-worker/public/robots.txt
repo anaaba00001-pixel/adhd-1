@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://adhd-1.anaaba00001.workers.dev/sitemap.xml
